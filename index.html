@@ -230,6 +230,12 @@
           statusEl.className = statusText.includes("Ngã") ? "alert-danger" : "";
 
           document.getElementById('recognizedInfo').style.display = 'block';
+
+          // Gửi thông tin user này lên Google Sheets để ESP32 đọc hiển thị OLED
+          fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: "setCurrentUser", name: user.name, age: user.age })
+          }).catch();
         }
       } catch (err) {
         console.warn("Không lấy được thông tin user:", err);
