@@ -25,7 +25,17 @@
     #recognizedInfo { background: #eef9ff; border: 1px solid #bce8f1; padding: 12px; border-radius: 6px; margin-top: 12px; text-align: left; display: none; }
     .alert-danger { color: #d9534f; font-weight: bold; }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js"></script>
+
+  <!-- CDN chính jsDelivr kết hợp cơ chế dự phòng tự động chuyển sang unpkg nếu lỗi -->
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js" onerror="loadBackupCDN()"></script>
+  <script>
+    function loadBackupCDN() {
+      console.warn("Chuyển sang CDN dự phòng...");
+      var script = document.createElement('script');
+      script.src = 'https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js';
+      document.head.appendChild(script);
+    }
+  </script>
 </head>
 <body>
 
@@ -91,29 +101,37 @@
     let isAIReady = false;
     let isBusy = false;
 
-    window.addEventListener('DOMContentLoaded', async () => {
+    // Cơ chế đợi an toàn cho đến khi thư viện load xong 100%
+    window.addEventListener('DOMContentLoaded', () => {
       const statusEl = document.getElementById('camStatus');
       const btnCam = document.getElementById('btnCam');
-      statusEl.innerText = 'Đang tải trọng số AI Face-API...';
+      statusEl.innerText = 'Đang kết nối thư viện AI...';
 
-      try {
-        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-        await faceapi.loadTinyFaceDetectorModel(MODEL_URL);
-        await faceapi.loadFaceLandmarkModel(MODEL_URL);
-        await faceapi.loadFaceRecognitionModel(MODEL_URL);
-        
-        isAIReady = true;
-        statusEl.innerText = 'AI đã sẵn sàng! Hãy bấm bật camera.';
-        btnCam.disabled = false;
-        btnCam.innerText = '1. Bật Web Camera & Nhận diện';
+      let checkInterval = setInterval(async () => {
+        if (typeof faceapi !== 'undefined' && faceapi.nets) {
+          clearInterval(checkInterval);
+          statusEl.innerText = 'Đang tải trọng số mô hình AI...';
 
-        loadAndPrepareFaceMatcher();
-      } catch (err) {
-        statusEl.innerText = 'Lỗi tải mô hình AI: ' + err.message;
-        console.error(err);
-      }
-      loadUserDataTable();
-      setInterval(loadUserDataTable, 4000); // Tự động cập nhật dữ liệu cảm biến mỗi 4 giây
+          try {
+            const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceLandmark64Net.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            
+            isAIReady = true;
+            statusEl.innerText = 'AI đã sẵn sàng! Hãy bấm bật camera.';
+            btnCam.disabled = false;
+            btnCam.innerText = '1. Bật Web Camera & Nhận diện';
+
+            loadAndPrepareFaceMatcher();
+          } catch (err) {
+            statusEl.innerText = 'Lỗi tải mô hình AI: ' + err.message;
+            console.error(err);
+          }
+          loadUserDataTable();
+          setInterval(loadUserDataTable, 4000);
+        }
+      }, 300);
     });
 
     async function loadAndPrepareFaceMatcher() {
@@ -189,7 +207,7 @@
           let gpsLink = user.gps !== '--' ? `<a href="https://www.google.com/maps?q=${user.gps}" target="_blank">🗺️ ${user.gps}</a>` : '--';
           document.getElementById('infoGPS').innerHTML = gpsLink;
           
-          let statusText = user.fallAlert;
+          let statusText = user.fallAlert || "Bình thường";
           let statusEl = document.getElementById('infoStatus');
           statusEl.innerText = statusText;
           statusEl.className = statusText.includes("Ngã") ? "alert-danger" : "";
@@ -279,7 +297,8 @@
         if (data.users && data.users.length > 0) {
           data.users.forEach(user => {
             let gpsHtml = user.gps !== '--' ? `<a href="https://www.google.com/maps?q=${user.gps}" target="_blank">🗺️ Mở Map</a>` : '--';
-            let alertHtml = user.fallAlert.includes("Ngã") ? `<span class="alert-danger">${user.fallAlert}</span>` : user.fallAlert;
+            let alertStr = user.fallAlert || "Bình thường";
+            let alertHtml = alertStr.includes("Ngã") ? `<span class="alert-danger">${alertStr}</span>` : alertStr;
             
             let row = `<tr>
               <td><b>${user.name}</b><br><small style="color:#666">${user.age}t - ${user.gender}</small></td>
