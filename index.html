@@ -9,7 +9,7 @@
     h3 { margin-top: 0; color: #0275d8; }
     .cam-section { text-align: center; background: #f8f9fa; padding: 15px; border-radius: 6px; }
     #webcam { border: 2px solid #333; border-radius: 6px; background: #000; display: block; margin: 10px auto; }
-    button { padding: 9px 16px; font-size: 13px; cursor: pointer; border-radius: 4px; border: none; background: #0275d8; color: white; font-weight: bold; }
+    button { padding: 9px 16px; font-size: 13px; cursor: pointer; border-radius: 4px; border: none; background: #0275d8; color: white; font-weight: bold; margin: 4px; }
     button:hover { background: #025aa5; }
     button:disabled { background: #cccccc; cursor: not-allowed; }
     .btn-danger { background: #d9534f; }
@@ -26,27 +26,21 @@
     .alert-danger { color: #d9534f; font-weight: bold; }
   </style>
 
-  <!-- Hệ thống CDN kép chống lỗi: Tự động đổi nguồn dự phòng nếu nguồn chính bị chặn -->
-  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js" onerror="loadBackupCDN()"></script>
-  <script>
-    function loadBackupCDN() {
-      console.warn("CDN chính lỗi, đang chuyển sang CDN dự phòng...");
-      var script = document.createElement('script');
-      script.src = 'https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js';
-      document.head.appendChild(script);
-    }
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 </head>
 <body>
 
   <div class="card cam-section">
     <h3>Hệ thống Face ID Nhận diện Sinh trắc học</h3>
     <video id="webcam" autoplay muted playsinline width="320" height="240"></video>
-    <button type="button" id="btnCam" onclick="startCameraAndRecognition()" disabled>1. Đang tải mô hình AI, vui lòng chờ...</button>
+    <div style="margin-top: 10px;">
+      <button type="button" id="btnCam" onclick="startCameraAndRecognition()" disabled>1. Bật Camera</button>
+      <button type="button" id="btnResetScan" onclick="resetFaceScan()" class="btn-success" style="display:none;">🔄 Quét khuôn mặt mới</button>
+    </div>
     <p id="camStatus">Đang khởi tạo hệ thống AI...</p>
 
     <div id="recognizedInfo">
-      <h4 style="margin:0 0 8px 0; color:#0275d8;">🎯 Đã nhận diện thành công:</h4>
+      <h4 style="margin:0 0 8px 0; color:#0275d8;">🎯 Đã nhận diện thành công (Đã khóa trạng thái):</h4>
       <p style="margin:4px 0;"><b>Họ tên:</b> <span id="infoName">--</span></p>
       <p style="margin:4px 0;"><b>Tuổi / Giới tính:</b> <span id="infoAgeGender">--</span></p>
       <p style="margin:4px 0;"><b>Nhịp tim:</b> <span id="infoHeartRate">--</span> bpm</p>
@@ -100,8 +94,8 @@
     let videoStream = null;
     let isAIReady = false;
     let isBusy = false;
+    let isFaceLocked = false; // Cờ khóa trạng thái sau khi quét thành công
 
-    // Cơ chế thông minh: Đợi thư viện sẵn sàng 100% rồi mới khởi tạo AI
     window.addEventListener('DOMContentLoaded', () => {
       const statusEl = document.getElementById('camStatus');
       const btnCam = document.getElementById('btnCam');
@@ -116,7 +110,6 @@
 
           try {
             const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-            
             await faceapi.loadTinyFaceDetectorModel(MODEL_URL);
             await faceapi.loadFaceLandmarkModel(MODEL_URL);
             await faceapi.loadFaceRecognitionModel(MODEL_URL);
@@ -124,18 +117,15 @@
             isAIReady = true;
             statusEl.innerText = 'AI đã sẵn sàng! Hãy bấm bật camera.';
             btnCam.disabled = false;
-            btnCam.innerText = '1. Bật Web Camera & Nhận diện';
-
             loadAndPrepareFaceMatcher();
           } catch (err) {
             statusEl.innerText = 'Lỗi tải mô hình AI: ' + err.message;
-            console.error(err);
           }
           loadUserDataTable();
-          setInterval(loadUserDataTable, 4000); // Tự động cập nhật dữ liệu cảm biến mỗi 4 giây
+          setInterval(loadUserDataTable, 4000);
         } else if (checkCount > 30) {
           clearInterval(checkTimer);
-          statusEl.innerText = 'Lỗi: Không thể tải thư viện Face-API từ CDN!';
+          statusEl.innerText = 'Lỗi: Không thể tải thư viện Face-API!';
         }
       }, 300);
     });
@@ -144,58 +134,52 @@
       try {
         const res = await fetch(`${APPS_SCRIPT_URL}?action=getUsers`);
         const data = await res.json();
-        
         if (data.users && data.users.length > 0) {
           labeledFaceDescriptors = data.users
             .filter(u => u.descriptor)
-            .map(u => new faceapi.LabeledFaceDescriptors(
-              String(u.id), 
-              [new Float32Array(u.descriptor)]
-            ));
-          
+            .map(u => new faceapi.LabeledFaceDescriptors(String(u.id), [new Float32Array(u.descriptor)]));
           if (labeledFaceDescriptors.length > 0) {
             faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6);
           }
         }
       } catch (err) {
-        console.warn("Chưa đồng bộ được FaceMatcher từ Google Sheets:", err);
+        console.warn("Chưa đồng bộ được FaceMatcher:", err);
       }
     }
 
     async function startCameraAndRecognition() {
       if (!isAIReady) return;
-
       const video = document.getElementById('webcam');
       const statusEl = document.getElementById('camStatus');
-      const infoBox = document.getElementById('recognizedInfo');
 
       try {
         videoStream = await navigator.mediaDevices.getUserMedia({ video: {} });
         video.srcObject = videoStream;
-        statusEl.innerText = 'Camera đang chạy... Đang quét nhận diện siêu tốc...';
+        statusEl.innerText = 'Camera đang chạy... Đang quét nhận diện...';
 
         setInterval(async () => {
-          if (!faceMatcher || !isAIReady || isBusy) return;
+          // Nếu đã khóa (đã nhận diện thành công) thì dừng quét tự động
+          if (!faceMatcher || !isAIReady || isBusy || isFaceLocked) return;
           isBusy = true;
           
           try {
             const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
-            const detection = await faceapi.detectSingleFace(video, options)
-                                           .withFaceLandmarks()
-                                           .withFaceDescriptor();
+            const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
             if (detection) {
               const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
               if (bestMatch.label !== "unknown") {
                 const matchedId = bestMatch.label;
-                statusEl.innerText = `Đã nhận diện thành công ID: ${matchedId}`;
+                statusEl.innerText = `✅ Đã nhận diện thành công ID: ${matchedId}`;
                 fetchUserAndDisplay(matchedId);
-                fetch(`${APPS_SCRIPT_URL}?action=selectUser&id=${matchedId}`).catch();
+                
+                // Khóa hệ thống lại sau khi nhận diện thành công
+                isFaceLocked = true;
+                document.getElementById('btnResetScan').style.display = 'inline-block';
               } else {
-                statusEl.innerText = 'Khuôn mặt chưa có trong hệ thống!';
-                infoBox.style.display = 'none';
+                statusEl.innerText = '❌ Không nhận diện được khuôn mặt!';
               }
             } else {
-              statusEl.innerText = 'Camera đang quét: Đang chờ khuôn mặt...';
+              statusEl.innerText = 'Đang quét: Hãy nhìn vào camera...';
             }
           } catch (e) {
             console.error(e);
@@ -206,6 +190,14 @@
       } catch (err) {
         statusEl.innerText = 'Lỗi Camera: ' + err.message;
       }
+    }
+
+    // Nút mở khóa để quét khuôn mặt mới
+    function resetFaceScan() {
+      isFaceLocked = false;
+      document.getElementById('recognizedInfo').style.display = 'none';
+      document.getElementById('btnResetScan').style.display = 'none';
+      document.getElementById('camStatus').innerText = 'Đã mở khóa! Đang tiếp tục quét...';
     }
 
     async function fetchUserAndDisplay(id) {
@@ -231,10 +223,10 @@
 
           document.getElementById('recognizedInfo').style.display = 'block';
 
-          // Gửi thông tin user này lên Google Sheets để ESP32 đọc hiển thị OLED
+          // Gửi thông tin người dùng lên Sheets để ESP32 cập nhật OLED
           fetch(APPS_SCRIPT_URL, {
             method: 'POST',
-            body: JSON.stringify({ action: "setCurrentUser", name: user.name, age: user.age })
+            body: JSON.stringify({ action: "setCurrentUser", userId: user.id, name: user.name, age: user.age })
           }).catch();
         }
       } catch (err) {
@@ -243,14 +235,8 @@
     }
 
     async function registerNewUserWithFace() {
-      if (!isAIReady) {
-        alert("Mô hình AI chưa tải xong!");
-        return;
-      }
-      if (isBusy) {
-        alert("Hệ thống đang bận quét, vui lòng thử lại sau 1 giây!");
-        return;
-      }
+      if (!isAIReady) { alert("Mô hình AI chưa tải xong!"); return; }
+      if (isBusy) { alert("Hệ thống đang bận!"); return; }
 
       const name = document.getElementById('regName').value;
       const age = document.getElementById('regAge').value;
@@ -258,35 +244,19 @@
       const weight = document.getElementById('regWeight').value;
       const height = document.getElementById('regHeight').value;
 
-      if (!name || !age) {
-        alert("Vui lòng điền Tên và Tuổi!");
-        return;
-      }
-
+      if (!name || !age) { alert("Vui lòng điền Tên và Tuổi!"); return; }
       const video = document.getElementById('webcam');
-      if (!video.srcObject) {
-        alert("Vui lòng bật Camera trước!");
-        return;
-      }
+      if (!video.srcObject) { alert("Vui lòng bật Camera trước!"); return; }
 
       isBusy = true;
-      const statusEl = document.getElementById('camStatus');
-      statusEl.innerText = "⏳ Đang quét đặc trưng khuôn mặt đăng ký...";
-
       try {
         const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
-        const detection = await faceapi.detectSingleFace(video, options)
-                                       .withFaceLandmarks()
-                                       .withFaceDescriptor();
+        const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
         if (!detection) {
-          statusEl.innerText = "❌ Không tìm thấy khuôn mặt trước camera!";
-          alert("Không tìm thấy khuôn mặt, vui lòng chỉnh lại góc nhìn!");
+          alert("Không tìm thấy khuôn mặt trước camera!");
           isBusy = false;
           return;
         }
-
-        statusEl.innerText = "🚀 Đang gửi dữ liệu lên Google Sheets...";
-        const descriptorArray = Array.from(detection.descriptor);
 
         const payload = {
           action: "addUser",
@@ -295,21 +265,14 @@
           gender: gender,
           weight: weight,
           height: height,
-          descriptor: descriptorArray
+          descriptor: Array.from(detection.descriptor)
         };
 
-        const res = await fetch(APPS_SCRIPT_URL, {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-        await res.json();
-        
-        statusEl.innerText = `✅ Đăng ký thành công người dùng: ${name}!`;
-        alert(`Đăng ký thành công người dùng: ${name}!`);
+        await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+        alert(`Đăng ký thành công: ${name}!`);
         await loadAndPrepareFaceMatcher();
         loadUserDataTable();
       } catch (err) {
-        statusEl.innerText = "❌ Lỗi khi thêm người dùng lên Sheets!";
         console.error(err);
       } finally {
         isBusy = false;
@@ -317,20 +280,16 @@
     }
 
     function deleteUserCompletely(id, name) {
-      if (!confirm(`Bạn có chắc muốn xóa vĩnh viễn user [${name}] không?`)) return;
-
+      if (!confirm(`Bạn có chắc muốn xóa user [${name}] không?`)) return;
       fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         body: JSON.stringify({ action: "deleteUser", id: id })
       })
-      .then(res => res.json())
-      .then(data => {
-        alert("Đã xóa vĩnh viễn thành công!");
+      .then(() => {
         loadAndPrepareFaceMatcher();
         loadUserDataTable();
         document.getElementById('recognizedInfo').style.display = 'none';
-      })
-      .catch(err => alert("Lỗi khi xóa!"));
+      });
     }
 
     async function loadUserDataTable() {
@@ -353,9 +312,7 @@
               <td>${user.temperature} °C</td>
               <td>${gpsHtml}</td>
               <td>${alertHtml}</td>
-              <td>
-                <button class="btn-danger" onclick="deleteUserCompletely('${user.id}', '${user.name}')">Xóa</button>
-              </td>
+              <td><button class="btn-danger" onclick="deleteUserCompletely('${user.id}', '${user.name}')">Xóa</button></td>
             </tr>`;
             tableBody.innerHTML += row;
           });
@@ -363,10 +320,9 @@
           tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center;">Chưa có dữ liệu</td></tr>`;
         }
       } catch (err) {
-        console.warn("Lỗi tải bảng dữ liệu từ Sheets:", err);
-        document.getElementById('dataTable').innerHTML = `<tr><td colspan="7" style="text-align: center; color: #d9534f;">Chưa kết nối được Google Sheets</td></tr>`;
+        console.warn("Lỗi tải bảng dữ liệu");
       }
     }
   </script>
 </body>
-</html> 
+</html>
