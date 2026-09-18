@@ -2,9 +2,9 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
-  <title>Hệ thống Face ID Nhận diện Sinh trắc học</title>
+  <title>Hệ thống Face ID Nhận diện Sinh trắc học & Cảm biến</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 950px; margin: 20px auto; padding: 0 15px; background: #fdfdfd; color: #333; }
+    body { font-family: Arial, sans-serif; max-width: 1100px; margin: 20px auto; padding: 0 15px; background: #fdfdfd; color: #333; }
     .card { background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     h3 { margin-top: 0; color: #0275d8; }
     .cam-section { text-align: center; background: #f8f9fa; padding: 15px; border-radius: 6px; }
@@ -18,11 +18,12 @@
     .btn-success:hover { background: #4cae4c; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
     input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
     th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
     th { background-color: #f2f2f2; }
     #camStatus { font-weight: bold; color: #0275d8; margin-top: 8px; }
     #recognizedInfo { background: #eef9ff; border: 1px solid #bce8f1; padding: 12px; border-radius: 6px; margin-top: 12px; text-align: left; display: none; }
+    .alert-danger { color: #d9534f; font-weight: bold; }
   </style>
 
   <!-- Hệ thống CDN kép chống lỗi: Tự động đổi nguồn dự phòng nếu nguồn chính bị chặn -->
@@ -48,9 +49,11 @@
       <h4 style="margin:0 0 8px 0; color:#0275d8;">🎯 Đã nhận diện thành công:</h4>
       <p style="margin:4px 0;"><b>Họ tên:</b> <span id="infoName">--</span></p>
       <p style="margin:4px 0;"><b>Tuổi / Giới tính:</b> <span id="infoAgeGender">--</span></p>
-      <p style="margin:4px 0;"><b>Cân nặng / Chiều cao:</b> <span id="infoWeightHeight">--</span></p>
-      <p style="margin:4px 0;"><b>Nhịp tim:</b> <span id="infoHeartRate" style="color:red; font-weight:bold;">75 bpm</span></p>
-      <p style="margin:4px 0;"><b>SpO2:</b> <span id="infoSpO2" style="color:green; font-weight:bold;">98%</span></p>
+      <p style="margin:4px 0;"><b>Nhịp tim:</b> <span id="infoHeartRate">--</span> bpm</p>
+      <p style="margin:4px 0;"><b>SpO2:</b> <span id="infoSpO2">--</span>%</p>
+      <p style="margin:4px 0;"><b>Nhiệt độ:</b> <span id="infoTemp">--</span> °C</p>
+      <p style="margin:4px 0;"><b>GPS:</b> <span id="infoGPS">--</span></p>
+      <p style="margin:4px 0;"><b>Trạng thái:</b> <span id="infoStatus">--</span></p>
     </div>
   </div>
 
@@ -70,19 +73,21 @@
   </div>
 
   <div class="card">
-    <h3>Danh sách toàn bộ người dùng trong hệ thống</h3>
+    <h3>Danh sách & Giám sát Cảm biến Vòng tay</h3>
     <table>
       <thead>
         <tr>
-          <th>ID</th>
           <th>Tên</th>
-          <th>Tuổi</th>
-          <th>CN / CC</th>
+          <th>Nhịp tim</th>
+          <th>SpO2</th>
+          <th>Nhiệt độ</th>
+          <th>Tọa độ GPS</th>
+          <th>Té ngã</th>
           <th>Thao tác</th>
         </tr>
       </thead>
       <tbody id="dataTable">
-        <tr><td colspan="5" style="text-align: center;">Đang tải dữ liệu...</td></tr>
+        <tr><td colspan="7" style="text-align: center;">Đang tải dữ liệu...</td></tr>
       </tbody>
     </table>
   </div>
@@ -96,7 +101,7 @@
     let isAIReady = false;
     let isBusy = false;
 
-    // Fix lỗi kẹt tải thư viện bằng cách kiểm tra trực tiếp đối tượng faceapi
+    // Cơ chế thông minh: Đợi thư viện sẵn sàng 100% rồi mới khởi tạo AI
     window.addEventListener('DOMContentLoaded', () => {
       const statusEl = document.getElementById('camStatus');
       const btnCam = document.getElementById('btnCam');
@@ -127,6 +132,7 @@
             console.error(err);
           }
           loadUserDataTable();
+          setInterval(loadUserDataTable, 4000); // Tự động cập nhật dữ liệu cảm biến mỗi 4 giây
         } else if (checkCount > 30) {
           clearInterval(checkTimer);
           statusEl.innerText = 'Lỗi: Không thể tải thư viện Face-API từ CDN!';
@@ -211,7 +217,18 @@
         if (user) {
           document.getElementById('infoName').innerText = user.name;
           document.getElementById('infoAgeGender').innerText = `${user.age} tuổi - ${user.gender}`;
-          document.getElementById('infoWeightHeight').innerText = `${user.weight || '--'} kg / ${user.height || '--'} cm`;
+          document.getElementById('infoHeartRate').innerText = user.heartRate;
+          document.getElementById('infoSpO2').innerText = user.spo2;
+          document.getElementById('infoTemp').innerText = user.temperature;
+          
+          let gpsLink = user.gps !== '--' ? `<a href="https://www.google.com/maps?q=${user.gps}" target="_blank">🗺️ ${user.gps}</a>` : '--';
+          document.getElementById('infoGPS').innerHTML = gpsLink;
+          
+          let statusText = user.fallAlert || "Bình thường";
+          let statusEl = document.getElementById('infoStatus');
+          statusEl.innerText = statusText;
+          statusEl.className = statusText.includes("Ngã") ? "alert-danger" : "";
+
           document.getElementById('recognizedInfo').style.display = 'block';
         }
       } catch (err) {
@@ -319,25 +336,31 @@
         
         if(data.users && data.users.length > 0) {
           data.users.forEach(user => {
+            let gpsHtml = user.gps !== '--' ? `<a href="https://www.google.com/maps?q=${user.gps}" target="_blank">🗺️ Mở Map</a>` : '--';
+            let alertStr = user.fallAlert || "Bình thường";
+            let alertHtml = alertStr.includes("Ngã") ? `<span class="alert-danger">${alertStr}</span>` : alertStr;
+
             let row = `<tr>
-              <td>${user.id}</td>
-              <td>${user.name}</td>
-              <td>${user.age}</td>
-              <td>${user.weight || '--'}kg / ${user.height || '--'}cm</td>
+              <td><b>${user.name}</b><br><small style="color:#666">${user.age}t - ${user.gender}</small></td>
+              <td>${user.heartRate} bpm</td>
+              <td>${user.spo2}%</td>
+              <td>${user.temperature} °C</td>
+              <td>${gpsHtml}</td>
+              <td>${alertHtml}</td>
               <td>
-                <button class="btn-danger" onclick="deleteUserCompletely('${user.id}', '${user.name}')">Xóa vĩnh viễn</button>
+                <button class="btn-danger" onclick="deleteUserCompletely('${user.id}', '${user.name}')">Xóa</button>
               </td>
             </tr>`;
             tableBody.innerHTML += row;
           });
         } else {
-          tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center;">Chưa có dữ liệu</td></tr>`;
+          tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center;">Chưa có dữ liệu</td></tr>`;
         }
       } catch (err) {
         console.warn("Lỗi tải bảng dữ liệu từ Sheets:", err);
-        document.getElementById('dataTable').innerHTML = `<tr><td colspan="5" style="text-align: center; color: #d9534f;">Chưa kết nối được Google Sheets (Kiểm tra quyền Deploy Apps Script)</td></tr>`;
+        document.getElementById('dataTable').innerHTML = `<tr><td colspan="7" style="text-align: center; color: #d9534f;">Chưa kết nối được Google Sheets</td></tr>`;
       }
     }
   </script>
 </body>
-</html>
+</html> 
