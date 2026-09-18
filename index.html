@@ -26,16 +26,8 @@
     .alert-danger { color: #d9534f; font-weight: bold; }
   </style>
 
-  <!-- CDN chính jsDelivr kết hợp cơ chế dự phòng tự động chuyển sang unpkg nếu lỗi -->
-  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js" onerror="loadBackupCDN()"></script>
-  <script>
-    function loadBackupCDN() {
-      console.warn("Chuyển sang CDN dự phòng...");
-      var script = document.createElement('script');
-      script.src = 'https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js';
-      document.head.appendChild(script);
-    }
-  </script>
+  <!-- Nạp thư viện Face-API chuẩn qua CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/face-api.js/0.22.2/face-api.min.js"></script>
 </head>
 <body>
 
@@ -101,22 +93,23 @@
     let isAIReady = false;
     let isBusy = false;
 
-    // Cơ chế đợi an toàn cho đến khi thư viện load xong 100%
     window.addEventListener('DOMContentLoaded', () => {
       const statusEl = document.getElementById('camStatus');
       const btnCam = document.getElementById('btnCam');
       statusEl.innerText = 'Đang kết nối thư viện AI...';
 
       let checkInterval = setInterval(async () => {
-        if (typeof faceapi !== 'undefined' && faceapi.nets) {
+        if (typeof faceapi !== 'undefined') {
           clearInterval(checkInterval);
           statusEl.innerText = 'Đang tải trọng số mô hình AI...';
 
           try {
             const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-            await faceapi.nets.faceLandmark64Net.loadFromUri(MODEL_URL);
-            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            
+            // Sử dụng các hàm nạp cấp cao chuẩn, tương thích tuyệt đối với phiên bản thư viện
+            await faceapi.loadTinyFaceDetectorModel(MODEL_URL);
+            await faceapi.loadFaceLandmarkModel(MODEL_URL);
+            await faceapi.loadFaceRecognitionModel(MODEL_URL);
             
             isAIReady = true;
             statusEl.innerText = 'AI đã sẵn sàng! Hãy bấm bật camera.';
