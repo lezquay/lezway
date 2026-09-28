@@ -89,12 +89,17 @@
     </table>
   </div>
 
-  <!-- Popup hiển thị mã QR -->
+  <!-- Popup hiển thị mã QR kèm nút In và Tải ảnh -->
   <div id="qrModal">
     <div class="modal-content">
       <h3 id="qrTitle" style="margin-top:0;">Mã QR Định Danh</h3>
       <div id="qrcode" style="margin: 15px auto; display: inline-block;"></div>
-      <p style="margin-bottom:0;"><button onclick="closeQrModal()">Đóng</button></p>
+      
+      <div style="margin-top: 15px; display: flex; justify-content: center; gap: 10px;">
+        <button type="button" onclick="printQRCode()" class="btn-success">🖨️ In mã QR</button>
+        <button type="button" onclick="downloadQRCode()" class="btn-qr">📥 Tải ảnh về</button>
+        <button type="button" onclick="closeQrModal()" class="btn-danger">Đóng</button>
+      </div>
     </div>
   </div>
 
@@ -312,6 +317,43 @@
 
     function closeQrModal() {
       document.getElementById('qrModal').style.display = 'none';
+    }
+
+    // Hàm In mã QR
+    function printQRCode() {
+      const qrContainer = document.getElementById('qrcode').innerHTML;
+      const qrTitle = document.getElementById('qrTitle').innerText;
+      
+      const printWindow = window.open('', '', 'height=500,width=500');
+      printWindow.document.write('<html><head><title>In Mã QR Định Danh</title></head>');
+      printWindow.document.write('<style>body{text-align:center;font-family:Arial;margin-top:40px;}</style>');
+      printWindow.document.write('<body>');
+      printWindow.document.write('<h2>' + qrTitle.replace('\n', '<br>') + '</h2>');
+      printWindow.document.write(qrContainer);
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      printWindow.focus();
+      
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    }
+
+    // Hàm Tải ảnh mã QR về máy
+    function downloadQRCode() {
+      const qrCanvas = document.querySelector('#qrcode canvas');
+      if (qrCanvas) {
+        const imageURL = qrCanvas.toDataURL("image/png");
+        const link = document.createElement('a');
+        link.href = imageURL;
+        link.download = 'QR_DinhDanh.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        alert("Không tìm thấy ảnh QR để tải!");
+      }
     }
 
     async function loadUserDataTable() {
