@@ -2,52 +2,63 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
-  <title>Hệ thống Face ID Nhận diện Sinh trắc học & Cảm biến</title>
+  <title>Hệ thống Face ID Nhận diện Sinh trắc học</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 1100px; margin: 20px auto; padding: 0 15px; background: #fdfdfd; color: #333; }
+    body { font-family: Arial, sans-serif; max-width: 950px; margin: 20px auto; padding: 0 15px; background: #fdfdfd; color: #333; }
     .card { background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     h3 { margin-top: 0; color: #0275d8; }
     .cam-section { text-align: center; background: #f8f9fa; padding: 15px; border-radius: 6px; }
     #webcam { border: 2px solid #333; border-radius: 6px; background: #000; display: block; margin: 10px auto; }
-    button { padding: 9px 16px; font-size: 13px; cursor: pointer; border-radius: 4px; border: none; background: #0275d8; color: white; font-weight: bold; margin: 4px; }
+    button { padding: 9px 16px; font-size: 13px; cursor: pointer; border-radius: 4px; border: none; background: #0275d8; color: white; font-weight: bold; }
     button:hover { background: #025aa5; }
     button:disabled { background: #cccccc; cursor: not-allowed; }
     .btn-danger { background: #d9534f; }
     .btn-danger:hover { background: #c9302c; }
     .btn-success { background: #5cb85c; }
     .btn-success:hover { background: #4cae4c; }
+    .btn-qr { background: #f0ad4e; color: #fff; }
+    .btn-qr:hover { background: #ec971f; }
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
     input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
     th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
     th { background-color: #f2f2f2; }
     #camStatus { font-weight: bold; color: #0275d8; margin-top: 8px; }
     #recognizedInfo { background: #eef9ff; border: 1px solid #bce8f1; padding: 12px; border-radius: 6px; margin-top: 12px; text-align: left; display: none; }
-    .alert-danger { color: #d9534f; font-weight: bold; }
+    
+    /* CSS cho hộp thoại Popup hiển thị mã QR */
+    #qrModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: #fff; padding: 25px; border-radius: 8px; text-align: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
   </style>
 
-  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <!-- Thư viện Face API từ nguồn cũ -->
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js" onerror="loadBackupCDN()"></script>
+  <!-- Thư viện tạo mã QR trực tiếp trên giao diện -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    function loadBackupCDN() {
+      var script = document.createElement('script');
+      script.src = 'https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js';
+      document.head.appendChild(script);
+    }
+  </script>
 </head>
 <body>
 
   <div class="card cam-section">
     <h3>Hệ thống Face ID Nhận diện Sinh trắc học</h3>
     <video id="webcam" autoplay muted playsinline width="320" height="240"></video>
-    <div style="margin-top: 10px;">
-      <button type="button" id="btnCam" onclick="startCameraAndRecognition()" disabled>1. Bật Camera</button>
-      <button type="button" id="btnResetScan" onclick="resetFaceScan()" class="btn-success" style="display:none;">🔄 Quét khuôn mặt mới</button>
-    </div>
+    <button type="button" id="btnCam" onclick="startCameraAndRecognition()" disabled>1. Đang tải mô hình AI, vui lòng chờ...</button>
     <p id="camStatus">Đang khởi tạo hệ thống AI...</p>
 
     <div id="recognizedInfo">
-      <h4 style="margin:0 0 8px 0; color:#0275d8;">🎯 Đã nhận diện thành công (Đã khóa trạng thái):</h4>
+      <h4 style="margin:0 0 8px 0; color:#0275d8;">🎯 Đã nhận diện thành công:</h4>
       <p style="margin:4px 0;"><b>Họ tên:</b> <span id="infoName">--</span></p>
       <p style="margin:4px 0;"><b>Tuổi / Giới tính:</b> <span id="infoAgeGender">--</span></p>
-      <p style="margin:4px 0;"><b>Nhịp tim:</b> <span id="infoHeartRate">--</span> bpm</p>
-      <p style="margin:4px 0;"><b>SpO2:</b> <span id="infoSpO2">--</span>%</p>
-      <p style="margin:4px 0;"><b>Nhiệt độ:</b> <span id="infoTemp">--</span> °C</p>
-      <p style="margin:4px 0;"><b>GPS:</b> <span id="infoGPS">--</span></p>
-      <p style="margin:4px 0;"><b>Trạng thái:</b> <span id="infoStatus">--</span></p>
+      <p style="margin:4px 0;"><b>Cân nặng / Chiều cao:</b> <span id="infoWeightHeight">--</span></p>
+      <p style="margin:4px 0;"><b>Nhịp tim:</b> <span id="infoHeartRate" style="color:red; font-weight:bold;">-- bpm</span></p>
+      <p style="margin:4px 0;"><b>SpO2:</b> <span id="infoSpO2" style="color:green; font-weight:bold;">-- %</span></p>
+      <p style="margin:4px 0;"><b>Nhiệt độ:</b> <span id="infoTemp" style="color:orange; font-weight:bold;">-- °C</span></p>
     </div>
   </div>
 
@@ -67,7 +78,7 @@
   </div>
 
   <div class="card">
-    <h3>Danh sách & Giám sát Cảm biến Vòng tay</h3>
+    <h3>Danh sách toàn bộ người dùng và Giám sát Cảm biến</h3>
     <table>
       <thead>
         <tr>
@@ -86,15 +97,24 @@
     </table>
   </div>
 
+  <!-- Popup hiển thị mã QR khi bấm nút Tạo QR -->
+  <div id="qrModal">
+    <div class="modal-content">
+      <h3 id="qrTitle" style="margin-top:0;">Mã QR Định Danh</h3>
+      <div id="qrcode" style="margin: 15px auto; display: inline-block;"></div>
+      <p style="margin-bottom:0;"><button onclick="closeQrModal()">Đóng</button></p>
+    </div>
+  </div>
+
   <script>
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-D-S8tJjQ5YK6sYrp8CIc3iU2ncCHVlsgl9BFny0lf44tPoO0NjT62DfqHJ0imtLW7g/exec';
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-D-S8tJjQ5YK6sYrp8CIc3iU2ncCHVlsgl9BFny0lf44tPoO0NjT62DfqHJ0imtLW7g/exec';[cite: 8]
 
     let labeledFaceDescriptors = [];
     let faceMatcher = null;
     let videoStream = null;
     let isAIReady = false;
     let isBusy = false;
-    let isFaceLocked = false; // Cờ khóa trạng thái sau khi quét thành công
+    let currentActiveUserId = null;
 
     window.addEventListener('DOMContentLoaded', () => {
       const statusEl = document.getElementById('camStatus');
@@ -104,7 +124,7 @@
       let checkCount = 0;
       let checkTimer = setInterval(async () => {
         checkCount++;
-        if (typeof faceapi !== 'undefined') {
+        if (typeof faceapi !== 'undefined' && faceapi.nets) {
           clearInterval(checkTimer);
           statusEl.innerText = 'Đang tải trọng số mô hình AI...';
 
@@ -117,210 +137,224 @@
             isAIReady = true;
             statusEl.innerText = 'AI đã sẵn sàng! Hãy bấm bật camera.';
             btnCam.disabled = false;
+            btnCam.innerText = '1. Bật Web Camera & Nhận diện';
+
             loadAndPrepareFaceMatcher();
           } catch (err) {
             statusEl.innerText = 'Lỗi tải mô hình AI: ' + err.message;
           }
           loadUserDataTable();
-          setInterval(loadUserDataTable, 4000);
-        } else if (checkCount > 30) {
+          setInterval(loadUserDataTable, 3000);
+        } else if (checkCount > 20) {
           clearInterval(checkTimer);
-          statusEl.innerText = 'Lỗi: Không thể tải thư viện Face-API!';
+          statusEl.innerText = 'Lỗi: Không thể tải thư viện Face-API từ CDN!';
         }
-      }, 300);
+      }, 400);
     });
 
     async function loadAndPrepareFaceMatcher() {
       try {
-        const res = await fetch(`${APPS_SCRIPT_URL}?action=getUsers`);
-        const data = await res.json();
+        const res = await fetch(`${APPS_SCRIPT_URL}?action=getUsers`);[cite: 8]
+        const data = await res.json();[cite: 8]
+        
         if (data.users && data.users.length > 0) {
           labeledFaceDescriptors = data.users
             .filter(u => u.descriptor)
-            .map(u => new faceapi.LabeledFaceDescriptors(String(u.id), [new Float32Array(u.descriptor)]));
+            .map(u => new faceapi.LabeledFaceDescriptors(
+              String(u.id),[cite: 8]
+              [new Float32Array(u.descriptor)][cite: 8]
+            ));
+          
           if (labeledFaceDescriptors.length > 0) {
-            faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6);
+            faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6);[cite: 8]
           }
         }
       } catch (err) {
-        console.warn("Chưa đồng bộ được FaceMatcher:", err);
+        console.warn("Chưa đồng bộ được FaceMatcher:", err);[cite: 8]
       }
     }
 
     async function startCameraAndRecognition() {
-      if (!isAIReady) return;
-      const video = document.getElementById('webcam');
-      const statusEl = document.getElementById('camStatus');
+      if (!isAIReady) return;[cite: 8]
+
+      const video = document.getElementById('webcam');[cite: 8]
+      const statusEl = document.getElementById('camStatus');[cite: 8]
+      const infoBox = document.getElementById('recognizedInfo');[cite: 8]
 
       try {
-        videoStream = await navigator.mediaDevices.getUserMedia({ video: {} });
-        video.srcObject = videoStream;
-        statusEl.innerText = 'Camera đang chạy... Đang quét nhận diện...';
+        videoStream = await navigator.mediaDevices.getUserMedia({ video: {} });[cite: 8]
+        video.srcObject = videoStream;[cite: 8]
+        statusEl.innerText = 'Camera đang chạy... Đang quét nhận diện...';[cite: 8]
 
         setInterval(async () => {
-          // Nếu đã khóa (đã nhận diện thành công) thì dừng quét tự động
-          if (!faceMatcher || !isAIReady || isBusy || isFaceLocked) return;
-          isBusy = true;
+          if (!faceMatcher || !isAIReady || isBusy) return;[cite: 8]
+          isBusy = true;[cite: 8]
           
           try {
-            const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
-            const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
+            const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });[cite: 8]
+            const detection = await faceapi.detectSingleFace(video, options)[cite: 8]
+                                           .withFaceLandmarks()[cite: 8]
+                                           .withFaceDescriptor();[cite: 8]
             if (detection) {
-              const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+              const bestMatch = faceMatcher.findBestMatch(detection.descriptor);[cite: 8]
               if (bestMatch.label !== "unknown") {
-                const matchedId = bestMatch.label;
-                statusEl.innerText = `✅ Đã nhận diện thành công ID: ${matchedId}`;
-                fetchUserAndDisplay(matchedId);
+                const matchedId = bestMatch.label;[cite: 8]
+                statusEl.innerText = `Đã nhận diện thành công ID: ${matchedId}`;[cite: 8]
+                currentActiveUserId = matchedId;[cite: 8]
+                fetchUserAndDisplay(matchedId);[cite: 8]
                 
-                // Khóa hệ thống lại sau khi nhận diện thành công
-                isFaceLocked = true;
-                document.getElementById('btnResetScan').style.display = 'inline-block';
+                fetch(APPS_SCRIPT_URL, {[cite: 8]
+                  method: 'POST',[cite: 8]
+                  body: JSON.stringify({ action: 'setCurrentUser', userId: matchedId })[cite: 8]
+                }).catch();[cite: 8]
+
               } else {
-                statusEl.innerText = '❌ Không nhận diện được khuôn mặt!';
+                statusEl.innerText = 'Khuôn mặt chưa có trong hệ thống!';[cite: 8]
+                infoBox.style.display = 'none';[cite: 8]
+                currentActiveUserId = null;[cite: 8]
               }
             } else {
-              statusEl.innerText = 'Đang quét: Hãy nhìn vào camera...';
+              statusEl.innerText = 'Camera đang quét: Đang chờ khuôn mặt...';[cite: 8]
             }
           } catch (e) {
-            console.error(e);
+            console.error(e);[cite: 8]
           } finally {
-            isBusy = false;
+            isBusy = false;[cite: 8]
           }
-        }, 2500);
+        }, 2500);[cite: 8]
       } catch (err) {
-        statusEl.innerText = 'Lỗi Camera: ' + err.message;
+        statusEl.innerText = 'Lỗi Camera: ' + err.message;[cite: 8]
       }
-    }
-
-    // Nút mở khóa để quét khuôn mặt mới
-    function resetFaceScan() {
-      isFaceLocked = false;
-      document.getElementById('recognizedInfo').style.display = 'none';
-      document.getElementById('btnResetScan').style.display = 'none';
-      document.getElementById('camStatus').innerText = 'Đã mở khóa! Đang tiếp tục quét...';
     }
 
     async function fetchUserAndDisplay(id) {
       try {
-        const res = await fetch(`${APPS_SCRIPT_URL}?action=getUsers`);
-        const data = await res.json();
-        const user = data.users.find(u => String(u.id) === String(id));
+        const res = await fetch(`${APPS_SCRIPT_URL}?action=getUsers`);[cite: 8]
+        const data = await res.json();[cite: 8]
+        const user = data.users.find(u => String(u.id) === String(id));[cite: 8]
         
         if (user) {
-          document.getElementById('infoName').innerText = user.name;
-          document.getElementById('infoAgeGender').innerText = `${user.age} tuổi - ${user.gender}`;
-          document.getElementById('infoHeartRate').innerText = user.heartRate;
-          document.getElementById('infoSpO2').innerText = user.spo2;
-          document.getElementById('infoTemp').innerText = user.temperature;
-          
-          let gpsLink = user.gps !== '--' ? `<a href="https://www.google.com/maps?q=${user.gps}" target="_blank">🗺️ ${user.gps}</a>` : '--';
-          document.getElementById('infoGPS').innerHTML = gpsLink;
-          
-          let statusText = user.fallAlert || "Bình thường";
-          let statusEl = document.getElementById('infoStatus');
-          statusEl.innerText = statusText;
-          statusEl.className = statusText.includes("Ngã") ? "alert-danger" : "";
-
-          document.getElementById('recognizedInfo').style.display = 'block';
-
-          // Gửi thông tin người dùng lên Sheets để ESP32 cập nhật OLED
-          fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: "setCurrentUser", userId: user.id, name: user.name, age: user.age })
-          }).catch();
+          document.getElementById('infoName').innerText = user.name;[cite: 8]
+          document.getElementById('infoAgeGender').innerText = `${user.age} tuổi - ${user.gender}`;[cite: 8]
+          document.getElementById('infoWeightHeight').innerText = `${user.weight || '--'} kg / ${user.height || '--'} cm`;[cite: 8]
+          document.getElementById('infoHeartRate').innerText = `${user.heartRate} bpm`;[cite: 8]
+          document.getElementById('infoSpO2').innerText = `${user.spo2} %`;[cite: 8]
+          document.getElementById('infoTemp').innerText = `${user.temperature} °C`;[cite: 8]
+          document.getElementById('recognizedInfo').style.display = 'block';[cite: 8]
         }
       } catch (err) {
-        console.warn("Không lấy được thông tin user:", err);
+        console.warn("Không lấy được thông tin user:", err);[cite: 8]
       }
     }
 
     async function registerNewUserWithFace() {
-      if (!isAIReady) { alert("Mô hình AI chưa tải xong!"); return; }
-      if (isBusy) { alert("Hệ thống đang bận!"); return; }
+      if (!isAIReady) { alert("Mô hình AI chưa tải xong!"); return; }[cite: 8]
+      if (isBusy) { alert("Hệ thống đang bận quét!"); return; }[cite: 8]
 
-      const name = document.getElementById('regName').value;
-      const age = document.getElementById('regAge').value;
-      const gender = document.getElementById('regGender').value;
-      const weight = document.getElementById('regWeight').value;
-      const height = document.getElementById('regHeight').value;
+      const name = document.getElementById('regName').value;[cite: 8]
+      const age = document.getElementById('regAge').value;[cite: 8]
+      const gender = document.getElementById('regGender').value;[cite: 8]
+      const weight = document.getElementById('regWeight').value;[cite: 8]
+      const height = document.getElementById('regHeight').value;[cite: 8]
 
-      if (!name || !age) { alert("Vui lòng điền Tên và Tuổi!"); return; }
-      const video = document.getElementById('webcam');
-      if (!video.srcObject) { alert("Vui lòng bật Camera trước!"); return; }
+      if (!name || !age) { alert("Vui lòng điền Tên và Tuổi!"); return; }[cite: 8]
 
-      isBusy = true;
+      const video = document.getElementById('webcam');[cite: 8]
+      if (!video.srcObject) { alert("Vui lòng bật Camera trước!"); return; }[cite: 8]
+
+      isBusy = true;[cite: 8]
+      const statusEl = document.getElementById('camStatus');[cite: 8]
+      statusEl.innerText = "⏳ Đang quét đặc trưng khuôn mặt đăng ký...";[cite: 8]
+
       try {
-        const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
-        const detection = await faceapi.detectSingleFace(video, options).withFaceLandmarks().withFaceDescriptor();
+        const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });[cite: 8]
+        const detection = await faceapi.detectSingleFace(video, options)[cite: 8]
+                                       .withFaceLandmarks()[cite: 8]
+                                       .withFaceDescriptor();[cite: 8]
         if (!detection) {
-          alert("Không tìm thấy khuôn mặt trước camera!");
-          isBusy = false;
-          return;
+          alert("Không tìm thấy khuôn mặt trước camera!");[cite: 8]
+          isBusy = false;[cite: 8]
+          return;[cite: 8]
         }
 
-        const payload = {
-          action: "addUser",
-          name: name,
-          age: age,
-          gender: gender,
-          weight: weight,
-          height: height,
-          descriptor: Array.from(detection.descriptor)
+        const descriptorArray = Array.from(detection.descriptor);[cite: 8]
+        const payload = {[cite: 8]
+          action: "addUser",[cite: 8]
+          name: name, age: age, gender: gender, weight: weight, height: height,[cite: 8]
+          descriptor: descriptorArray[cite: 8]
         };
 
-        await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
-        alert(`Đăng ký thành công: ${name}!`);
-        await loadAndPrepareFaceMatcher();
-        loadUserDataTable();
+        await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });[cite: 8]
+        alert(`Đăng ký thành công người dùng: ${name}!`);[cite: 8]
+        await loadAndPrepareFaceMatcher();[cite: 8]
+        loadUserDataTable();[cite: 8]
       } catch (err) {
-        console.error(err);
+        alert("Lỗi khi thêm người dùng!");[cite: 8]
       } finally {
-        isBusy = false;
+        isBusy = false;[cite: 8]
       }
     }
 
     function deleteUserCompletely(id, name) {
-      if (!confirm(`Bạn có chắc muốn xóa user [${name}] không?`)) return;
-      fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: "deleteUser", id: id })
-      })
-      .then(() => {
-        loadAndPrepareFaceMatcher();
-        loadUserDataTable();
-        document.getElementById('recognizedInfo').style.display = 'none';
+      if (!confirm(`Bạn có chắc muốn xóa vĩnh viễn user [${name}] không?`)) return;[cite: 8]
+      fetch(APPS_SCRIPT_URL, {[cite: 8]
+        method: 'POST',[cite: 8]
+        body: JSON.stringify({ action: "deleteUser", id: id })[cite: 8]
+      }).then(() => {
+        loadAndPrepareFaceMatcher();[cite: 8]
+        loadUserDataTable();[cite: 8]
+        document.getElementById('recognizedInfo').style.display = 'none';[cite: 8]
       });
+    }
+
+    // --- Các hàm thêm mới để tạo và hiển thị Mã QR cho từng ID ---
+    function generateQRCode(userId, userName) {
+      document.getElementById('qrTitle').innerText = `Mã QR của: ${userName}\n(ID: ${userId})`;
+      document.getElementById('qrcode').innerHTML = ""; // Xóa QR cũ nếu có
+      new QRCode(document.getElementById("qrcode"), {
+        text: userId, // Nội dung chuỗi QR đúng bằng ID của user (vd: USER_1234)
+        width: 180,
+        height: 180
+      });
+      document.getElementById('qrModal').style.display = 'flex';
+    }
+
+    function closeQrModal() {
+      document.getElementById('qrModal').style.display = 'none';
     }
 
     async function loadUserDataTable() {
       try {
-        const res = await fetch(`${APPS_SCRIPT_URL}?action=getUsers`);
-        const data = await res.json();
-        const tableBody = document.getElementById('dataTable');
-        tableBody.innerHTML = '';
+        const res = await fetch(`${APPS_SCRIPT_URL}?action=getUsers`);[cite: 8]
+        const data = await res.json();[cite: 8]
+        const tableBody = document.getElementById('dataTable');[cite: 8]
+        tableBody.innerHTML = '';[cite: 8]
         
-        if(data.users && data.users.length > 0) {
-          data.users.forEach(user => {
-            let gpsHtml = user.gps !== '--' ? `<a href="https://www.google.com/maps?q=${user.gps}" target="_blank">🗺️ Mở Map</a>` : '--';
-            let alertStr = user.fallAlert || "Bình thường";
-            let alertHtml = alertStr.includes("Ngã") ? `<span class="alert-danger">${alertStr}</span>` : alertStr;
-
+        if(data.users && data.users.length > 0) {[cite: 8]
+          data.users.forEach(user => {[cite: 8]
             let row = `<tr>
-              <td><b>${user.name}</b><br><small style="color:#666">${user.age}t - ${user.gender}</small></td>
-              <td>${user.heartRate} bpm</td>
-              <td>${user.spo2}%</td>
-              <td>${user.temperature} °C</td>
-              <td>${gpsHtml}</td>
-              <td>${alertHtml}</td>
-              <td><button class="btn-danger" onclick="deleteUserCompletely('${user.id}', '${user.name}')">Xóa</button></td>
-            </tr>`;
-            tableBody.innerHTML += row;
+              <td><b>${user.name}</b><br><small>${user.id}</small></td>[cite: 8]
+              <td style="color:red; font-weight:bold;">${user.heartRate} bpm</td>[cite: 8]
+              <td style="color:green; font-weight:bold;">${user.spo2} %</td>[cite: 8]
+              <td style="color:orange; font-weight:bold;">${user.temperature} °C</td>[cite: 8]
+              <td>${user.gps}</td>[cite: 8]
+              <td>${user.fallAlert}</td>[cite: 8]
+              <td>
+                <button class="btn-qr" onclick="generateQRCode('${user.id}', '${user.name}')">Tạo QR</button>
+                <button class="btn-danger" onclick="deleteUserCompletely('${user.id}', '${user.name}')">Xóa</button>
+              </td>
+            </tr>`;[cite: 8]
+            tableBody.innerHTML += row;[cite: 8]
           });
+
+          if (currentActiveUserId) {[cite: 8]
+            fetchUserAndDisplay(currentActiveUserId);[cite: 8]
+          }
         } else {
-          tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center;">Chưa có dữ liệu</td></tr>`;
+          tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center;">Chưa có dữ liệu</td></tr>`;[cite: 8]
         }
       } catch (err) {
-        console.warn("Lỗi tải bảng dữ liệu");
+        console.warn("Lỗi tải bảng dữ liệu");[cite: 8]
       }
     }
   </script>
