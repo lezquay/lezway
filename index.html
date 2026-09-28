@@ -121,8 +121,7 @@
           statusEl.innerText = 'Đang tải trọng số mô hình AI...';
 
           try {
-            // Thay đổi đường dẫn sang thư mục models cục bộ trên máy của bạn
-            const MODEL_URL = './models';
+            const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
             await faceapi.loadTinyFaceDetectorModel(MODEL_URL);
             await faceapi.loadFaceLandmarkModel(MODEL_URL);
             await faceapi.loadFaceRecognitionModel(MODEL_URL);
@@ -300,7 +299,6 @@
       });
     }
 
-    // Hàm tạo và hiển thị QR Code cho từng ID
     function generateQRCode(userId, userName) {
       document.getElementById('qrTitle').innerText = `Mã QR của: ${userName}\n(ID: ${userId})`;
       document.getElementById('qrcode').innerHTML = ""; 
